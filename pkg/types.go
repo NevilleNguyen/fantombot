@@ -57,81 +57,81 @@ func (v SFCValidator) FormatListParams() []interface{} {
 	return result
 }
 
-type SFCStakeInfo struct {
-	Delegator   string
-	ValidatorID uint64
-	Amount      float64
-	BlockNumber uint64
-	TxHash      string
+type SFCDelegateInfo struct {
+	Delegator     string
+	ToValidatorID uint64
+	Amount        float64
+	BlockNumber   uint64
+	TxHash        string
 }
 
-func ToSFCStakeInfo(v *contracts.SFCLockedUpStake) SFCStakeInfo {
-	return SFCStakeInfo{
-		Delegator:   v.Delegator.Hex(),
-		ValidatorID: v.ValidatorID.Uint64(),
-		Amount:      WeiToFloat(v.Amount, 18),
-		BlockNumber: v.Raw.BlockNumber,
-		TxHash:      v.Raw.TxHash.Hex(),
+func ToSFCDelegateInfo(v *contracts.SFCDelegated) SFCDelegateInfo {
+	return SFCDelegateInfo{
+		Delegator:     v.Delegator.Hex(),
+		ToValidatorID: v.ToValidatorID.Uint64(),
+		Amount:        WeiToFloat(v.Amount, 18),
+		BlockNumber:   v.Raw.BlockNumber,
+		TxHash:        v.Raw.TxHash.Hex(),
 	}
 }
 
-func (v SFCStakeInfo) FormatMap() map[string]interface{} {
+func (v SFCDelegateInfo) FormatMap() map[string]interface{} {
 	return map[string]interface{}{
-		"delegator":    v.Delegator,
-		"validator_id": v.ValidatorID,
-		"amount":       v.Amount,
-		"block_number": v.BlockNumber,
-		"tx_hash":      v.TxHash,
+		"delegator":       v.Delegator,
+		"to_validator_id": v.ToValidatorID,
+		"amount":          v.Amount,
+		"block_number":    v.BlockNumber,
+		"tx_hash":         v.TxHash,
 	}
 }
 
-func (v SFCStakeInfo) FormatListParams() []interface{} {
+func (v SFCDelegateInfo) FormatListParams() []interface{} {
 	var result = make([]interface{}, 0)
 	result = append(result, "delegator", v.Delegator,
-		"validator_id", v.ValidatorID,
+		"to_validator_id", v.ToValidatorID,
 		"amount", v.Amount,
 		"block_number", v.BlockNumber,
 		"tx_hash", v.TxHash)
 	return result
 }
 
-type SFCUnstakeInfo struct {
-	Delegator   string
-	ValidatorID uint64
-	Amount      float64
-	Penalty     float64
-	BlockNumber uint64
-	TxHash      string
+type SFCUndelegateInfo struct {
+	Delegator     string
+	ToValidatorID uint64
+	Amount        float64
+	WrID          uint64
+	BlockNumber   uint64
+	TxHash        string
 }
 
-func ToSFCUnstakeInfo(v *contracts.SFCUnlockedStake) SFCUnstakeInfo {
-	return SFCUnstakeInfo{
-		Delegator:   v.Delegator.Hex(),
-		ValidatorID: v.ValidatorID.Uint64(),
-		Amount:      WeiToFloat(v.Amount, 18),
-		Penalty:     WeiToFloat(v.Amount, 18),
-		BlockNumber: v.Raw.BlockNumber,
-		TxHash:      v.Raw.TxHash.Hex(),
+func ToSFCUndelegateInfo(v *contracts.SFCUndelegated) SFCUndelegateInfo {
+	return SFCUndelegateInfo{
+		Delegator:     v.Delegator.Hex(),
+		ToValidatorID: v.ToValidatorID.Uint64(),
+		Amount:        WeiToFloat(v.Amount, 18),
+		WrID:          v.ToValidatorID.Uint64(),
+		BlockNumber:   v.Raw.BlockNumber,
+		TxHash:        v.Raw.TxHash.Hex(),
 	}
 }
 
-func (v SFCUnstakeInfo) FormatMap() map[string]interface{} {
+func (v SFCUndelegateInfo) FormatMap() map[string]interface{} {
 	return map[string]interface{}{
-		"delegator":    v.Delegator,
-		"validator_id": v.ValidatorID,
-		"amount":       v.Amount,
-		"penalty":      v.Penalty,
-		"block_number": v.BlockNumber,
-		"tx_hash":      v.TxHash,
+		"delegator":       v.Delegator,
+		"to_validator_id": v.ToValidatorID,
+		"amount":          v.Amount,
+		"wr_id":           v.WrID,
+		"block_number":    v.BlockNumber,
+		"tx_hash":         v.TxHash,
 	}
 }
 
-func (v SFCUnstakeInfo) FormatListParams() []interface{} {
+func (v SFCUndelegateInfo) FormatListParams() []interface{} {
 	var result = make([]interface{}, 0)
 	result = append(result, "delegator", v.Delegator,
-		"validator_id", v.ValidatorID,
+		"to_validator_id", v.ToValidatorID,
 		"amount", v.Amount,
-		"penalty", v.Penalty,
+		"wr_id", v.WrID,
 		"block_number", v.BlockNumber,
 		"tx_hash", v.TxHash)
 	return result

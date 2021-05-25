@@ -17,4 +17,3 @@ Run command:
 Run command:
 ```go run main.go start```
 
-# fantombot

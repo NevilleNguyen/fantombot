@@ -70,18 +70,19 @@ func (ts *SFCCLientTestSuite) TestGetValidatorByID() {
 	assert.Equal(false, validator.IsActive)
 }
 
-func (ts *SFCCLientTestSuite) TestGetStakeInfo() {
+func (ts *SFCCLientTestSuite) TestGetDelegate() {
 	assert := ts.Assert()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	stakeInfo, err := ts.client.GetStakeInfoByBlock(ctx, 7048077, nil)
+	toBlock := uint64(75147450)
+	delegateInfo, err := ts.client.GetDelegateInfoByBlock(ctx, 7514749, &toBlock)
 	assert.NoError(err)
-	assert.NotNil(stakeInfo)
-	assert.Greater(len(stakeInfo), 0)
-	lastStake := stakeInfo[len(stakeInfo)-1]
+	assert.NotNil(delegateInfo)
+	assert.Greater(len(delegateInfo), 0)
+	lastDelegate := delegateInfo[len(delegateInfo)-1]
 
-	log.Println(lastStake)
+	log.Println(lastDelegate)
 }
 
 func (ts *SFCCLientTestSuite) TestGetTxByHash() {

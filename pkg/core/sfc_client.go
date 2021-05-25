@@ -13,6 +13,7 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/quangkeu95/fantom-bot/lib/contracts"
 	"github.com/quangkeu95/fantom-bot/pkg"
+	"github.com/quangkeu95/fantom-bot/pkg/fetcher"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -23,14 +24,14 @@ const (
 
 type SFCClient struct {
 	l          *zap.SugaredLogger
-	nodeClient *NodeClient
-	wsClient   *WsClient
+	nodeClient *fetcher.NodeClient
+	wsClient   *fetcher.WsClient
 
 	sfcContract   *contracts.SFC
 	sfcWsContract *contracts.SFC
 }
 
-func NewSFCClient(nodeClient *NodeClient, wsClient *WsClient) (*SFCClient, error) {
+func NewSFCClient(nodeClient *fetcher.NodeClient, wsClient *fetcher.WsClient) (*SFCClient, error) {
 	l := zap.S()
 	sfcAddr := viper.GetString("fantom_chain.sfc_contract_address")
 	if err := validation.Validate(sfcAddr, validation.Required); err != nil {
@@ -201,26 +202,26 @@ func (c *SFCClient) GetLastValidatorID(ctx context.Context) (uint64, error) {
 	return res.Uint64(), nil
 }
 
-func (c *SFCClient) GetStakeInfoByBlock(ctx context.Context, fromBlock uint64, toBlock *uint64) ([]pkg.SFCStakeInfo, error) {
-	var result = make([]pkg.SFCStakeInfo, 0)
+func (c *SFCClient) GetDelegateInfoByBlock(ctx context.Context, fromBlock uint64, toBlock *uint64) ([]pkg.SFCDelegateInfo, error) {
+	var result = make([]pkg.SFCDelegateInfo, 0)
 	opts := &bind.FilterOpts{
 		Context: ctx,
 		Start:   fromBlock,
 		End:     toBlock,
 	}
 
-	iterator, err := c.sfcContract.FilterLockedUpStake(opts, nil, nil)
+	iterator, err := c.sfcContract.FilterDelegated(opts, nil, nil)
 	if err != nil {
-		c.l.Warnw("get locked up stake error", "error", err)
+		c.l.Warnw("get delegate error", "error", err)
 		return nil, err
 	}
 
 	for iterator.Next() {
 		if err := iterator.Error(); err != nil {
-			c.l.Debugw("parse locked up stake error", "error", err)
+			c.l.Debugw("parse delegate info error", "error", err)
 			continue
 		}
-		result = append(result, pkg.ToSFCStakeInfo(iterator.Event))
+		result = append(result, pkg.ToSFCDelegateInfo(iterator.Event))
 	}
 
 	sort.SliceStable(result, func(i, j int) bool {
@@ -229,16 +230,16 @@ func (c *SFCClient) GetStakeInfoByBlock(ctx context.Context, fromBlock uint64, t
 	return result, nil
 }
 
-func (c *SFCClient) WatchStakeEvent(ctx context.Context, stakeInfoCh chan<- pkg.SFCStakeInfo, errCh chan<- error) {
+func (c *SFCClient) WatchDelegateEvent(ctx context.Context, delegateInfoCh chan<- pkg.SFCDelegateInfo, errCh chan<- error) {
 	opts := &bind.WatchOpts{
 		Context: ctx,
 	}
 	var (
-		sink = make(chan *contracts.SFCLockedUpStake)
+		sink = make(chan *contracts.SFCDelegated)
 	)
-	sub, err := c.sfcWsContract.WatchLockedUpStake(opts, sink, nil, nil)
+	sub, err := c.sfcWsContract.WatchDelegated(opts, sink, nil, nil)
 	if err != nil {
-		c.l.Warnw("watch stake error", "error", err)
+		c.l.Warnw("watch delegate error", "error", err)
 		errCh <- err
 		return
 	}
@@ -249,7 +250,7 @@ func (c *SFCClient) WatchStakeEvent(ctx context.Context, stakeInfoCh chan<- pkg.
 		case <-ctx.Done():
 			return
 		case info := <-sink:
-			stakeInfoCh <- pkg.ToSFCStakeInfo(info)
+			delegateInfoCh <- pkg.ToSFCDelegateInfo(info)
 		case err := <-sub.Err():
 			errCh <- err
 			return
@@ -257,26 +258,26 @@ func (c *SFCClient) WatchStakeEvent(ctx context.Context, stakeInfoCh chan<- pkg.
 	}
 }
 
-func (c *SFCClient) GetUnstakeInfoByBlock(ctx context.Context, fromBlock uint64, toBlock *uint64) ([]pkg.SFCUnstakeInfo, error) {
-	var result = make([]pkg.SFCUnstakeInfo, 0)
+func (c *SFCClient) GetUndelegateInfoByBlock(ctx context.Context, fromBlock uint64, toBlock *uint64) ([]pkg.SFCUndelegateInfo, error) {
+	var result = make([]pkg.SFCUndelegateInfo, 0)
 	opts := &bind.FilterOpts{
 		Context: ctx,
 		Start:   fromBlock,
 		End:     toBlock,
 	}
 
-	iterator, err := c.sfcContract.FilterUnlockedStake(opts, nil, nil)
+	iterator, err := c.sfcContract.FilterUndelegated(opts, nil, nil, nil)
 	if err != nil {
-		c.l.Warnw("get locked up stake error", "error", err)
+		c.l.Warnw("get undelegate error", "error", err)
 		return nil, err
 	}
 
 	for iterator.Next() {
 		if err := iterator.Error(); err != nil {
-			c.l.Debugw("parse locked up stake error", "error", err)
+			c.l.Debugw("parse undelegate error", "error", err)
 			continue
 		}
-		result = append(result, pkg.ToSFCUnstakeInfo(iterator.Event))
+		result = append(result, pkg.ToSFCUndelegateInfo(iterator.Event))
 	}
 
 	sort.SliceStable(result, func(i, j int) bool {
@@ -285,16 +286,16 @@ func (c *SFCClient) GetUnstakeInfoByBlock(ctx context.Context, fromBlock uint64,
 	return result, nil
 }
 
-func (c *SFCClient) WatchUnstakeEvent(ctx context.Context, unstakeInfoCh chan<- pkg.SFCUnstakeInfo, errCh chan<- error) {
+func (c *SFCClient) WatchUndelegateEvent(ctx context.Context, undelegateInfoCh chan<- pkg.SFCUndelegateInfo, errCh chan<- error) {
 	opts := &bind.WatchOpts{
 		Context: ctx,
 	}
 	var (
-		sink = make(chan *contracts.SFCUnlockedStake)
+		sink = make(chan *contracts.SFCUndelegated)
 	)
-	sub, err := c.sfcWsContract.WatchUnlockedStake(opts, sink, nil, nil)
+	sub, err := c.sfcWsContract.WatchUndelegated(opts, sink, nil, nil, nil)
 	if err != nil {
-		c.l.Warnw("watch unlocked stake error", "error", err)
+		c.l.Warnw("watch undelegate error", "error", err)
 		errCh <- err
 		return
 	}
@@ -305,7 +306,7 @@ func (c *SFCClient) WatchUnstakeEvent(ctx context.Context, unstakeInfoCh chan<- 
 		case <-ctx.Done():
 			return
 		case info := <-sink:
-			unstakeInfoCh <- pkg.ToSFCUnstakeInfo(info)
+			undelegateInfoCh <- pkg.ToSFCUndelegateInfo(info)
 		case err := <-sub.Err():
 			errCh <- err
 			return
@@ -342,7 +343,7 @@ func (c *SFCClient) WatchClaimRewardEvent(ctx context.Context, rewardInfoCh chan
 }
 
 func (c *SFCClient) SubscribeNewHead(ctx context.Context, headCh chan<- *types.Header, errCh chan<- error) {
-	sub, err := c.wsClient.client.SubscribeNewHead(ctx, headCh)
+	sub, err := c.wsClient.GetETHClient().SubscribeNewHead(ctx, headCh)
 	if err != nil {
 		c.l.Warnf("subscribe new head error", "error", err)
 		errCh <- err
