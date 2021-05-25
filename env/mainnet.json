@@ -1,7 +1,7 @@
 {
-    "min_staking_amount": 1,
-    "min_claim_amount": 1,
-    "min_transfer_amount": 1,
+    "min_staking_amount": 100,
+    "min_claim_amount": 100,
+    "min_transfer_amount": 100,
     "fantom_chain": {
         "sfc_contract_address": "0xfc00face00000000000000000000000000000000",
         "rpc_endpoint": "https://rpc.fantom.network/",
@@ -13,7 +13,7 @@
         "port": 80
     },
     "telegram": {
-        "token": "1040255352:AAEuUK4_NBv7akVSlICpW2qViPmPWsLISJo",
-        "chat_id": -398141136
+        "token": "1897961962:AAFoG8OIX5edLH-AWZFurftzR6EjaWMo3lA",
+        "chat_id": -525308538
     }
 }
