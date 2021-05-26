@@ -9,7 +9,7 @@ User=quangkeu95
 Group=quangkeu95
 
 WorkingDirectory=/home/quangkeu95/workspace/fantom-bot/
-ExecStart/home/quangkeu95/workspace/fantom-bot/build/fantombot start
+ExecStart=/home/quangkeu95/workspace/fantom-bot/build/fantombot start
 
 Restart=on-failure
 RestartSec=10

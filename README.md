@@ -30,8 +30,8 @@ Then copy the file `fantombot.service` to the path `/etc/systemd/system/`. Reloa
 
  After that you can start the service and check the status by using:
 ```
-systemctl fantom.service start
-systemctl fantom.service status
+service fantombot start
+service fantombot status
 ```
 
 Or watching logs
