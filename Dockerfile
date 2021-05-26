@@ -12,4 +12,4 @@ RUN go build
 #     apt-get install -y ca-certificates && \
 #     rm -rf /var/lib/apt/lists/*
 
-CMD ["/go/src/github.com/quangkeu95/fantom-bot/fantom-bot"]
+CMD ["/go/src/github.com/quangkeu95/fantom-bot"]
