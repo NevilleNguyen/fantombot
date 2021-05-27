@@ -11,9 +11,31 @@ You have to update these following configures in `env/mainnet.json` config file:
 
 # Builds
 Run command:
-```go build ./...```
+```go build -o ./build/fantombot```
 
 # Run 
 Run command:
-```go run main.go start```
+```./build/fantombot start```
+
+# Run as Ubuntu service
+Firstly take a look at the file `fantombot.service`, you have to update the following fields:
+- `ConditionPathExists`
+- `User`
+- `Group`
+- `WorkingDirectory`
+- `ExecStart`
+
+Then copy the file `fantombot.service` to the path `/etc/systemd/system/`. Reload the system daemon by running 
+`sudo systemctl daemon-reload`.
+
+ After that you can start the service and check the status by using:
+```
+service fantombot start
+service fantombot status
+```
+
+Or watching logs
+```
+journalctl -u fantombot -f
+```
 

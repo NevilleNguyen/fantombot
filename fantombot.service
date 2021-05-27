@@ -1,0 +1,22 @@
+[Unit]
+Description=Fantom bot
+ConditionPathExists=/home/quangkeu95/workspace/fantom-bot
+After=network.target
+
+[Service]
+Type=simple
+User=quangkeu95
+Group=quangkeu95
+
+WorkingDirectory=/home/quangkeu95/workspace/fantom-bot/
+ExecStart=/home/quangkeu95/workspace/fantom-bot/build/fantombot start
+
+Restart=on-failure
+RestartSec=10
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=fantombot
+
+[Install]
+WantedBy=multi-user.target
