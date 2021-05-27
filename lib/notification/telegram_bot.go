@@ -1,8 +1,6 @@
 package notification
 
 import (
-	"fmt"
-
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -13,6 +11,8 @@ const (
 	EmojiCheckMark = "\U00002705"
 	EmojiCrossMark = "\U0000274C"
 	EmojiStar      = "\U00002B50"
+	EmojiLock      = "\U0001F512"
+	EmojiUnlock    = "\U0001F513"
 )
 
 type TelegramBot struct {
@@ -49,28 +49,4 @@ func (b *TelegramBot) SendMessage(msg string) error {
 		return err
 	}
 	return err
-}
-
-func (b *TelegramBot) SendStructMessage(msg string, keyAndValues map[string]interface{}) error {
-	composedMsg := msg
-	for key, value := range keyAndValues {
-		composedMsg = fmt.Sprintf("%s | %v: %v", composedMsg, key, value)
-	}
-
-	return b.SendMessage(composedMsg)
-}
-
-func (b *TelegramBot) SendVariadicMessage(msg string, listParams ...interface{}) error {
-	if len(listParams)%2 != 0 {
-		return fmt.Errorf("list params must be divisible by 2, current length %v", len(listParams))
-	}
-	composedMsg := msg
-	var i int
-	for i < len(listParams) {
-		key := listParams[i]
-		value := listParams[i+1]
-		composedMsg = fmt.Sprintf("%s | %v: %v", composedMsg, key, value)
-		i += 2
-	}
-	return b.SendMessage(composedMsg)
 }

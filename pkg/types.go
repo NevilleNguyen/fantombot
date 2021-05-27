@@ -1,8 +1,6 @@
 package pkg
 
 import (
-	"fmt"
-
 	"github.com/quangkeu95/fantom-bot/lib/contracts"
 )
 
@@ -26,37 +24,6 @@ func ToSFCValidator(v *contracts.SFCCreatedValidator) SFCValidator {
 	}
 }
 
-func (v SFCValidator) Format() string {
-	return fmt.Sprintf("validator_id: %v | validator_address: %v | created_epoch: %v | created_time %v",
-		v.ID, v.Address, v.CreatedEpoch, v.CreatedTime)
-}
-
-func (v SFCValidator) FormatMap() map[string]interface{} {
-	return map[string]interface{}{
-		"validator_id":      v.ID,
-		"address":           v.Address,
-		"created_time":      v.CreatedTime,
-		"created_epoch":     v.CreatedEpoch,
-		"deactivated_time":  v.DeactivatedTime,
-		"deactivated_epoch": v.DeactivatedEpoch,
-		"is_active":         v.IsActive,
-		"is_offline":        v.IsOffline,
-	}
-}
-
-func (v SFCValidator) FormatListParams() []interface{} {
-	var result = make([]interface{}, 0)
-	result = append(result, "validator_id", v.ID,
-		"address", v.Address,
-		"created_time", v.CreatedTime,
-		"created_epoch", v.CreatedEpoch,
-		"deactivated_time", v.DeactivatedTime,
-		"deactivated_epoch", v.DeactivatedEpoch,
-		"is_active", v.IsActive,
-		"is_offline", v.IsOffline)
-	return result
-}
-
 type SFCDelegateInfo struct {
 	Delegator     string
 	ToValidatorID uint64
@@ -73,26 +40,6 @@ func ToSFCDelegateInfo(v *contracts.SFCDelegated) SFCDelegateInfo {
 		BlockNumber:   v.Raw.BlockNumber,
 		TxHash:        v.Raw.TxHash.Hex(),
 	}
-}
-
-func (v SFCDelegateInfo) FormatMap() map[string]interface{} {
-	return map[string]interface{}{
-		"delegator":       v.Delegator,
-		"to_validator_id": v.ToValidatorID,
-		"amount":          v.Amount,
-		"block_number":    v.BlockNumber,
-		"tx_hash":         v.TxHash,
-	}
-}
-
-func (v SFCDelegateInfo) FormatListParams() []interface{} {
-	var result = make([]interface{}, 0)
-	result = append(result, "delegator", v.Delegator,
-		"to_validator_id", v.ToValidatorID,
-		"amount", v.Amount,
-		"block_number", v.BlockNumber,
-		"tx_hash", v.TxHash)
-	return result
 }
 
 type SFCUndelegateInfo struct {
@@ -113,28 +60,6 @@ func ToSFCUndelegateInfo(v *contracts.SFCUndelegated) SFCUndelegateInfo {
 		BlockNumber:   v.Raw.BlockNumber,
 		TxHash:        v.Raw.TxHash.Hex(),
 	}
-}
-
-func (v SFCUndelegateInfo) FormatMap() map[string]interface{} {
-	return map[string]interface{}{
-		"delegator":       v.Delegator,
-		"to_validator_id": v.ToValidatorID,
-		"amount":          v.Amount,
-		"wr_id":           v.WrID,
-		"block_number":    v.BlockNumber,
-		"tx_hash":         v.TxHash,
-	}
-}
-
-func (v SFCUndelegateInfo) FormatListParams() []interface{} {
-	var result = make([]interface{}, 0)
-	result = append(result, "delegator", v.Delegator,
-		"to_validator_id", v.ToValidatorID,
-		"amount", v.Amount,
-		"wr_id", v.WrID,
-		"block_number", v.BlockNumber,
-		"tx_hash", v.TxHash)
-	return result
 }
 
 type SFCRewardInfo struct {
@@ -159,30 +84,6 @@ func ToSFCRewardInfo(v *contracts.SFCClaimedRewards) SFCRewardInfo {
 	}
 }
 
-func (v SFCRewardInfo) FormatMap() map[string]interface{} {
-	return map[string]interface{}{
-		"delegator":           v.Delegator,
-		"to_validator_id":     v.ToValidatorID,
-		"lockup_extra_reward": v.LockupExtraReward,
-		"lockup_base_reward":  v.LockupBaseReward,
-		"unlocked_reward":     v.UnlockedReward,
-		"block_number":        v.BlockNumber,
-		"tx_hash":             v.TxHash,
-	}
-}
-
-func (v SFCRewardInfo) FormatListParams() []interface{} {
-	var result = make([]interface{}, 0)
-	result = append(result, "delegator", v.Delegator,
-		"to_validator_id", v.ToValidatorID,
-		"lockup_extra_reward", v.LockupExtraReward,
-		"lockup_base_reward", v.LockupBaseReward,
-		"unlocked_reward", v.UnlockedReward,
-		"block_number", v.BlockNumber,
-		"tx_hash", v.TxHash)
-	return result
-}
-
 type TransferLog struct {
 	BlockNumber uint64
 	TxHash      string
@@ -191,22 +92,42 @@ type TransferLog struct {
 	Amount      float64
 }
 
-func (v TransferLog) FormatMap() map[string]interface{} {
-	return map[string]interface{}{
-		"block_number": v.BlockNumber,
-		"tx_hash":      v.TxHash,
-		"from":         v.From,
-		"to":           v.To,
-		"amount":       v.Amount,
+type SFCLockedUpStake struct {
+	Delegator   string
+	ValidatorID uint64
+	Duration    uint64
+	Amount      float64
+	BlockNumber uint64
+	TxHash      string
+}
+
+func ToSFCLockedUpStake(v *contracts.SFCLockedUpStake) SFCLockedUpStake {
+	return SFCLockedUpStake{
+		Delegator:   v.Delegator.Hex(),
+		ValidatorID: v.ValidatorID.Uint64(),
+		Duration:    v.Duration.Uint64(),
+		Amount:      WeiToFloat(v.Amount, 18),
+		BlockNumber: v.Raw.BlockNumber,
+		TxHash:      v.Raw.TxHash.Hex(),
 	}
 }
 
-func (v TransferLog) FormatListParams() []interface{} {
-	var result = make([]interface{}, 0)
-	result = append(result, "block_number", v.BlockNumber,
-		"tx_hash", v.TxHash,
-		"from", v.From,
-		"to", v.To,
-		"amount", v.Amount)
-	return result
+type SFCUnlockedStake struct {
+	Delegator   string
+	ValidatorID uint64
+	Amount      float64
+	Penalty     float64
+	BlockNumber uint64
+	TxHash      string
+}
+
+func ToSFCUnlockedStake(v *contracts.SFCUnlockedStake) SFCUnlockedStake {
+	return SFCUnlockedStake{
+		Delegator:   v.Delegator.Hex(),
+		ValidatorID: v.ValidatorID.Uint64(),
+		Amount:      WeiToFloat(v.Amount, 18),
+		Penalty:     WeiToFloat(v.Penalty, 18),
+		BlockNumber: v.Raw.BlockNumber,
+		TxHash:      v.Raw.TxHash.Hex(),
+	}
 }

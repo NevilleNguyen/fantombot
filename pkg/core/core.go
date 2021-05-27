@@ -3,6 +3,9 @@ package core
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -74,9 +77,9 @@ func New() (*Core, error) {
 		l.Errorw("min claim amount config error", "error", err)
 		return nil, err
 	}
-	minTransferAmount := viper.GetFloat64(MinClaimAmountFlag)
+	minTransferAmount := viper.GetFloat64(MinTransferAmountFlag)
 	if err := validation.Validate(minClaimAmount, validation.Required); err != nil {
-		l.Errorw("min claim amount config error", "error", err)
+		l.Errorw("min transfer amount config error", "error", err)
 		return nil, err
 	}
 
@@ -108,6 +111,7 @@ func (c *Core) Run() error {
 	defer cancel()
 
 	c.socialBot.SendMessage("fantom bot start")
+	c.l.Infow("fantom bot start", "min_staking_amount", c.minStakingAmount, "min_claim_amount", c.minClaimAmount, "min_transfer_amount", c.minTransferAmount)
 
 	if err := c.initFetchValidators(ctx); err != nil {
 		c.l.Warnw("fetch validators error", "error", err)
@@ -117,11 +121,19 @@ func (c *Core) Run() error {
 	go c.watchCreatedValidators(ctx)
 	go c.watchDelegateEvent(ctx)
 	go c.watchUndelegateEvent(ctx)
+	go c.watchLockedUpStakeEvent(ctx)
+	go c.watchUnlockedStakeEvent(ctx)
 	go c.watchClaimRewardEvent(ctx)
 	go c.watchFTMTransferEvent(ctx)
 
-	for {
-	}
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+
+	<-sigCh
+	c.l.Info("fantombot exit")
 	return nil
 }
 
@@ -161,7 +173,7 @@ func (c *Core) watchCreatedValidators(ctx context.Context) {
 			go c.sfcClient.WatchCreatedValidator(ctx, validatorCh, errCh)
 		case validator := <-validatorCh:
 			c.l.Debugw("new created validator", "validator_id", validator.ID)
-			c.validatorKeeper.Add(validator)
+			// c.validatorKeeper.Add(validator)
 			c.sendCreatedValidatorMessage(validator)
 		}
 	}
@@ -191,7 +203,7 @@ func (c *Core) watchDelegateEvent(ctx context.Context) {
 		case info := <-delegateInfoCh:
 			if info.Amount > c.minStakingAmount {
 				c.l.Debugw("new delegate event", "tx_hash", info.TxHash)
-				c.delegateInfoKeeper.Add(info)
+				// c.delegateInfoKeeper.Add(info)
 				c.sendDelegateMessage(info)
 			}
 		}
@@ -221,10 +233,66 @@ func (c *Core) watchUndelegateEvent(ctx context.Context) {
 		case info := <-undelegateInfoCh:
 			if info.Amount > c.minStakingAmount {
 				c.l.Debugw("new undelegate event", "tx_hash", info.TxHash)
-				c.undelegateInfoKeeper.Add(info)
+				// c.undelegateInfoKeeper.Add(info)
 				c.sendUndelegateMessage(info)
 			}
 
+		}
+	}
+}
+
+func (c *Core) watchLockedUpStakeEvent(ctx context.Context) {
+	var (
+		lockedUpStakeCh = make(chan pkg.SFCLockedUpStake)
+		errCh           = make(chan error)
+	)
+
+	c.l.Info("watch locked up stake event")
+
+	go c.sfcClient.WatchLockedUpStakeEvent(ctx, lockedUpStakeCh, errCh)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-errCh:
+			c.l.Warnw("reset WatchLockedUpStakeEvent subscription", "error", err)
+			<-ticker.C
+			go c.sfcClient.WatchLockedUpStakeEvent(ctx, lockedUpStakeCh, errCh)
+		case info := <-lockedUpStakeCh:
+			if info.Amount > c.minStakingAmount {
+				c.l.Debugw("new locked up stake event", "tx_hash", info.TxHash)
+				c.sendLockedUpStakeMessage(info)
+			}
+		}
+	}
+}
+
+func (c *Core) watchUnlockedStakeEvent(ctx context.Context) {
+	var (
+		unlockedStakeCh = make(chan pkg.SFCUnlockedStake)
+		errCh           = make(chan error)
+	)
+
+	c.l.Info("watch unlocked stake event")
+
+	go c.sfcClient.WatchUnlockedStakeEvent(ctx, unlockedStakeCh, errCh)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-errCh:
+			c.l.Warnw("reset WatchUnlockedStakeEvent subscription", "error", err)
+			<-ticker.C
+			go c.sfcClient.WatchUnlockedStakeEvent(ctx, unlockedStakeCh, errCh)
+		case info := <-unlockedStakeCh:
+			if info.Amount > c.minStakingAmount {
+				c.l.Debugw("new unlocked stake event", "tx_hash", info.TxHash)
+				c.sendUnlockedStakeMessage(info)
+			}
 		}
 	}
 }
@@ -252,7 +320,7 @@ func (c *Core) watchClaimRewardEvent(ctx context.Context) {
 		case info := <-rewardInfoCh:
 			if info.UnlockedReward > c.minClaimAmount {
 				c.l.Debugw("new claim reward event", "tx_hash", info.TxHash)
-				c.rewardInfoKeeper.Add(info)
+				// c.rewardInfoKeeper.Add(info)
 				c.sendClaimRewardMessage(info)
 			}
 		}
@@ -280,7 +348,6 @@ func (c *Core) watchFTMTransferEvent(ctx context.Context) {
 			go c.sfcClient.SubscribeNewHead(ctx, headCh, errCh)
 		case head := <-headCh:
 			blockNumber := head.Number.Uint64()
-			// c.l.Debugw("new block", "block_number", blockNumber)
 			blockNumber = blockNumber - ShiftBlock
 		L1:
 			for _, f := range c.fetchers {
@@ -346,6 +413,26 @@ func (c *Core) sendClaimRewardMessage(item pkg.SFCRewardInfo) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
 	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">reward claim event</a> of <b>%f FTM</b> from <code>%s</code> to validator ID <code>%d</code>",
 		notification.EmojiStar, explorerEndpoint, item.TxHash, item.UnlockedReward, item.Delegator, item.ToValidatorID)
+
+	if err := c.socialBot.SendMessage(msg); err != nil {
+		c.l.Debugw("bot send message error", "error", err)
+	}
+}
+
+func (c *Core) sendLockedUpStakeMessage(item pkg.SFCLockedUpStake) {
+	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
+	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">locked up stake event</a> of <b>%f FTM</b> from <code>%s</code> to validator ID <code>%d</code>",
+		notification.EmojiLock, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, item.ValidatorID)
+
+	if err := c.socialBot.SendMessage(msg); err != nil {
+		c.l.Debugw("bot send message error", "error", err)
+	}
+}
+
+func (c *Core) sendUnlockedStakeMessage(item pkg.SFCUnlockedStake) {
+	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
+	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">unlocked stake event</a> of <b>%f FTM</b> from <code>%s</code> to validator ID <code>%d</code>",
+		notification.EmojiUnlock, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, item.ValidatorID)
 
 	if err := c.socialBot.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)

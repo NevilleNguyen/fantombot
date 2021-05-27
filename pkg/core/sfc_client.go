@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/big"
 	"sort"
@@ -342,6 +341,62 @@ func (c *SFCClient) WatchClaimRewardEvent(ctx context.Context, rewardInfoCh chan
 	}
 }
 
+func (c *SFCClient) WatchLockedUpStakeEvent(ctx context.Context, lockedUpStakeCh chan<- pkg.SFCLockedUpStake, errCh chan<- error) {
+	opts := &bind.WatchOpts{
+		Context: ctx,
+	}
+	var (
+		sink = make(chan *contracts.SFCLockedUpStake)
+	)
+	sub, err := c.sfcWsContract.WatchLockedUpStake(opts, sink, nil, nil)
+	if err != nil {
+		c.l.Warnw("watch locked up stake error", "error", err)
+		errCh <- err
+		return
+	}
+	defer sub.Unsubscribe()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case info := <-sink:
+			lockedUpStakeCh <- pkg.ToSFCLockedUpStake(info)
+		case err := <-sub.Err():
+			errCh <- err
+			return
+		}
+	}
+}
+
+func (c *SFCClient) WatchUnlockedStakeEvent(ctx context.Context, unlockedStakeCh chan<- pkg.SFCUnlockedStake, errCh chan<- error) {
+	opts := &bind.WatchOpts{
+		Context: ctx,
+	}
+	var (
+		sink = make(chan *contracts.SFCUnlockedStake)
+	)
+	sub, err := c.sfcWsContract.WatchUnlockedStake(opts, sink, nil, nil)
+	if err != nil {
+		c.l.Warnw("watch unlocked stake error", "error", err)
+		errCh <- err
+		return
+	}
+	defer sub.Unsubscribe()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case info := <-sink:
+			unlockedStakeCh <- pkg.ToSFCUnlockedStake(info)
+		case err := <-sub.Err():
+			errCh <- err
+			return
+		}
+	}
+}
+
 func (c *SFCClient) SubscribeNewHead(ctx context.Context, headCh chan<- *types.Header, errCh chan<- error) {
 	sub, err := c.wsClient.GetETHClient().SubscribeNewHead(ctx, headCh)
 	if err != nil {
@@ -370,9 +425,4 @@ func (c *SFCClient) GetTxByHash(ctx context.Context, txHash string) error {
 	data := etherCommon.Bytes2Hex(tx.Data())
 	log.Println(data)
 	return nil
-}
-
-func FormatSFCCreatedValidator(v contracts.SFCCreatedValidator) string {
-	return fmt.Sprintf("validator_id: %v | validator_address: %v | created_epoch: %v | created_time %v",
-		v.ValidatorID.Int64(), v.Auth.Hex(), v.CreatedEpoch.Int64(), v.CreatedTime.Int64())
 }
