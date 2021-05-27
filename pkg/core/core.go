@@ -3,9 +3,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -123,14 +120,8 @@ func (c *Core) Run() error {
 	go c.watchClaimRewardEvent(ctx)
 	go c.watchFTMTransferEvent(ctx)
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
-
-	<-sigCh
-	c.l.Info("fantombot exit")
+	for {
+	}
 	return nil
 }
 
