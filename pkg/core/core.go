@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/quangkeu95/fantom-bot/pkg"
 	"github.com/quangkeu95/fantom-bot/pkg/fetcher"
 	"github.com/quangkeu95/fantom-bot/pkg/keeper"
+	"github.com/quangkeu95/fantom-bot/pkg/storage"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -23,6 +25,10 @@ const (
 	MinClaimAmountFlag    = "min_claim_amount"
 	MinTransferAmountFlag = "min_transfer_amount"
 	ShiftBlock            = uint64(5)
+)
+
+const (
+	SocialBotStorageKey = "social_bots"
 )
 
 type Core struct {
@@ -35,11 +41,14 @@ type Core struct {
 	undelegateInfoKeeper *keeper.UndelegateInfoKeeper
 	rewardInfoKeeper     *keeper.RewardInfoKeeper
 
-	socialBot notification.SocialBot
+	socialBots      []notification.SocialBot
+	keyValueStorage storage.KeyValueStorage
 
 	minStakingAmount  float64
 	minClaimAmount    float64
 	minTransferAmount float64
+
+	mu sync.RWMutex
 }
 
 func New() (*Core, error) {
@@ -57,13 +66,7 @@ func New() (*Core, error) {
 
 	sfcClient, err := NewSFCClient(nodeClient, wsClient)
 	if err != nil {
-		l.Errorw("error initial SFC client", "error", err)
-		return nil, err
-	}
-
-	telegramBot, err := notification.NewTelegramBot()
-	if err != nil {
-		l.Errorw("error initial social bot", "error", err)
+		l.Errorw("error initialize SFC client", "error", err)
 		return nil, err
 	}
 
@@ -86,12 +89,18 @@ func New() (*Core, error) {
 	fetchers := make([]fetcher.Fetcher, 0)
 	graphqlClient, err := fetcher.NewGraphqlClient()
 	if err != nil {
-		l.Errorw("error initial GraphQL client", "error", err)
+		l.Errorw("error initialize GraphQL client", "error", err)
 		return nil, err
 	}
 	fetchers = append(fetchers, graphqlClient, nodeClient)
 
-	return &Core{
+	badgerDB, err := storage.NewBadgerDB()
+	if err != nil {
+		l.Errorw("error initialize badger db", "error", err)
+		return nil, err
+	}
+
+	c := &Core{
 		l:                    l,
 		sfcClient:            sfcClient,
 		fetchers:             fetchers,
@@ -99,18 +108,25 @@ func New() (*Core, error) {
 		delegateInfoKeeper:   keeper.NewDelegateInfoKeeper(),
 		undelegateInfoKeeper: keeper.NewUndelegateInfoKeeper(),
 		rewardInfoKeeper:     keeper.NewRewardInfoKeeper(),
-		socialBot:            telegramBot,
+		keyValueStorage:      badgerDB,
 		minStakingAmount:     minStakingAmount,
 		minClaimAmount:       minClaimAmount,
 		minTransferAmount:    minTransferAmount,
-	}, nil
+		mu:                   sync.RWMutex{},
+	}
+
+	if err := c.initSocialBots(); err != nil {
+		l.Errorw("error initialize social bot", "error", err)
+		return nil, err
+	}
+	return c, nil
 }
 
 func (c *Core) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	c.socialBot.SendMessage("fantom bot start")
+	c.SendMessage("fantom bot start")
 	c.l.Infow("fantom bot start", "min_staking_amount", c.minStakingAmount, "min_claim_amount", c.minClaimAmount, "min_transfer_amount", c.minTransferAmount)
 
 	if err := c.initFetchValidators(ctx); err != nil {
@@ -137,6 +153,27 @@ func (c *Core) Run() error {
 	return nil
 }
 
+func (c *Core) initSocialBots() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var socialBots = make([]notification.SocialBot, 0)
+	if err := c.keyValueStorage.Get(SocialBotStorageKey, &socialBots); err != nil {
+		// c.l.Debugw("error get social bot storage, fallback default", "error", err)
+
+		token := viper.GetString("telegram.token")
+		chatId := viper.GetInt64("telegram.chat_id")
+		telegramBot, err := notification.NewTelegramBot(token, chatId)
+		if err != nil {
+			c.l.Errorw("error initialize social bot", "error", err)
+			return err
+		}
+		socialBots = append(socialBots, telegramBot)
+	}
+
+	c.socialBots = socialBots
+	return nil
+}
+
 func (c *Core) initFetchValidators(ctx context.Context) error {
 	for _, f := range c.fetchers {
 		validators, err := f.GetListValidators(ctx)
@@ -150,6 +187,14 @@ func (c *Core) initFetchValidators(ctx context.Context) error {
 	}
 	return fmt.Errorf("cannot fetch validators from any fetcher")
 }
+
+// func (c *Core) updateSocialBotStorageInterval() {
+// 	ticker := time.NewTicker(1 * time.Second)
+// 	defer ticker.Stop()
+// 	for {
+
+// 	}
+// }
 
 func (c *Core) watchCreatedValidators(ctx context.Context) {
 	var (
@@ -173,7 +218,7 @@ func (c *Core) watchCreatedValidators(ctx context.Context) {
 			go c.sfcClient.WatchCreatedValidator(ctx, validatorCh, errCh)
 		case validator := <-validatorCh:
 			c.l.Debugw("new created validator", "validator_id", validator.ID)
-			// c.validatorKeeper.Add(validator)
+			c.validatorKeeper.Add(validator)
 			c.sendCreatedValidatorMessage(validator)
 		}
 	}
@@ -369,12 +414,23 @@ func (c *Core) watchFTMTransferEvent(ctx context.Context) {
 	}
 }
 
+func (c *Core) SendMessage(msg string) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, socialBot := range c.socialBots {
+		if err := socialBot.SendMessage(msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *Core) sendCreatedValidatorMessage(item pkg.SFCValidator) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
 	msg := fmt.Sprintf("A new <a href=\"%s/address/%s\">created validator</a> with ID <b>%v</b> ",
 		explorerEndpoint, item.Address, item.ID)
 
-	if err := c.socialBot.SendMessage(msg); err != nil {
+	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
 	}
 }
@@ -384,57 +440,96 @@ func (c *Core) sendBigTransferMessage(item pkg.TransferLog) {
 	msg := fmt.Sprintf("%v Big <a href=\"%s/tx/%s\">transfer</a> of <b>%f FTM</b> from <code>%s</code> to <code>%s</code>",
 		notification.EmojiWhale, explorerEndpoint, item.TxHash, item.Amount, item.From, item.To)
 
-	if err := c.socialBot.SendMessage(msg); err != nil {
+	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
 	}
 }
 
 func (c *Core) sendDelegateMessage(item pkg.SFCDelegateInfo) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
-	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">delegation event</a> of <b>%f FTM</b> from <code>%s</code> to validator ID <code>%d</code>",
-		notification.EmojiCheckMark, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, item.ToValidatorID)
 
-	if err := c.socialBot.SendMessage(msg); err != nil {
+	validatorMsg := fmt.Sprintf("validator ID %v", item.ToValidatorID)
+
+	validator := c.validatorKeeper.GetValidatorById(item.ToValidatorID)
+	if validator != nil {
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ToValidatorID)
+	}
+	msg := fmt.Sprintf("%v A <a href=\"%s/tx/%s\">delegation event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
+		notification.EmojiCheckMark, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, validatorMsg)
+
+	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
 	}
 }
 
 func (c *Core) sendUndelegateMessage(item pkg.SFCUndelegateInfo) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
-	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">undelegation event</a> of <b>%f FTM</b> from <code>%s</code> to validator ID <code>%d</code>",
-		notification.EmojiCrossMark, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, item.ToValidatorID)
 
-	if err := c.socialBot.SendMessage(msg); err != nil {
+	validatorMsg := fmt.Sprintf("validator ID %v", item.ToValidatorID)
+
+	validator := c.validatorKeeper.GetValidatorById(item.ToValidatorID)
+	if validator != nil {
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ToValidatorID)
+	}
+
+	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">undelegation event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
+		notification.EmojiCrossMark, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, validatorMsg)
+
+	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
 	}
 }
 
 func (c *Core) sendClaimRewardMessage(item pkg.SFCRewardInfo) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
-	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">reward claim event</a> of <b>%f FTM</b> from <code>%s</code> to validator ID <code>%d</code>",
-		notification.EmojiStar, explorerEndpoint, item.TxHash, item.UnlockedReward, item.Delegator, item.ToValidatorID)
 
-	if err := c.socialBot.SendMessage(msg); err != nil {
+	validatorMsg := fmt.Sprintf("validator ID %v", item.ToValidatorID)
+
+	validator := c.validatorKeeper.GetValidatorById(item.ToValidatorID)
+	if validator != nil {
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ToValidatorID)
+	}
+
+	msg := fmt.Sprintf("%v A <a href=\"%s/tx/%s\">reward claim event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
+		notification.EmojiStar, explorerEndpoint, item.TxHash, item.UnlockedReward, item.Delegator, validatorMsg)
+
+	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
 	}
 }
 
 func (c *Core) sendLockedUpStakeMessage(item pkg.SFCLockedUpStake) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
-	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">locked up stake event</a> of <b>%f FTM</b> from <code>%s</code> to validator ID <code>%d</code>",
-		notification.EmojiLock, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, item.ValidatorID)
 
-	if err := c.socialBot.SendMessage(msg); err != nil {
+	validatorMsg := fmt.Sprintf("validator ID %v", item.ValidatorID)
+
+	validator := c.validatorKeeper.GetValidatorById(item.ValidatorID)
+	if validator != nil {
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ValidatorID)
+	}
+
+	msg := fmt.Sprintf("%v A <a href=\"%s/tx/%s\">locked up stake event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
+		notification.EmojiLock, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, validatorMsg)
+
+	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
 	}
 }
 
 func (c *Core) sendUnlockedStakeMessage(item pkg.SFCUnlockedStake) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
-	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">unlocked stake event</a> of <b>%f FTM</b> from <code>%s</code> to validator ID <code>%d</code>",
-		notification.EmojiUnlock, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, item.ValidatorID)
 
-	if err := c.socialBot.SendMessage(msg); err != nil {
+	validatorMsg := fmt.Sprintf("validator ID %v", item.ValidatorID)
+
+	validator := c.validatorKeeper.GetValidatorById(item.ValidatorID)
+	if validator != nil {
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ValidatorID)
+	}
+
+	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">unlocked stake event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
+		notification.EmojiUnlock, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, validatorMsg)
+
+	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
 	}
 }

@@ -23,6 +23,13 @@ func rootMain(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// httpHandler, err := core.NewHttpHandler(coreIns)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// go httpHandler.Run()
+
 	return coreIns.Run()
 }
 

@@ -41,3 +41,12 @@ func (k *ValidatorsKeeper) GetListValidators() map[uint64]pkg.SFCValidator {
 	}
 	return result
 }
+
+func (k *ValidatorsKeeper) GetValidatorById(id uint64) *pkg.SFCValidator {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	if v, ok := k.listValidators[id]; ok {
+		return &v
+	}
+	return nil
+}

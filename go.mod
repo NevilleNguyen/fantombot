@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
+	github.com/dgraph-io/badger/v3 v3.2011.1 // indirect
 	github.com/ethereum/go-ethereum v1.9.22
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.1

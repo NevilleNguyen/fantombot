@@ -1,0 +1,20 @@
+{
+    "min_staking_amount": 100,
+    "min_claim_amount": 100,
+    "min_transfer_amount": 100,
+    "fantom_chain": {
+        "sfc_contract_address": "0xfc00face00000000000000000000000000000000",
+        "rpc_endpoint": "https://rpc.fantom.network/",
+        "ws_endpoint": "wss://wsapi.fantom.network/",
+        "graphql_endpoint": "https://xapi.fantom.network/",
+        "explorer_tx_endpoint": "https://ftmscan.com/"
+    },
+    "http": {
+        "port": 8080
+    },
+    "telegram": {
+        "token": "1040255352:AAEuUK4_NBv7akVSlICpW2qViPmPWsLISJo",
+        "chat_id": -398141136
+    },
+    "storage_path": "./db/"
+}

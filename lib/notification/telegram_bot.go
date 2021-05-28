@@ -2,7 +2,6 @@ package notification
 
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -21,10 +20,8 @@ type TelegramBot struct {
 	chatId int64
 }
 
-func NewTelegramBot() (*TelegramBot, error) {
+func NewTelegramBot(token string, chatId int64) (*TelegramBot, error) {
 	l := zap.S()
-	token := viper.GetString("telegram.token")
-	chatId := viper.GetInt64("telegram.chat_id")
 
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
@@ -49,4 +46,8 @@ func (b *TelegramBot) SendMessage(msg string) error {
 		return err
 	}
 	return err
+}
+
+func (b *TelegramBot) GetChatID() int64 {
+	return b.chatId
 }
