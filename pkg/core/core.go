@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	validation "github.com/go-ozzo/ozzo-validation"
+	"github.com/quangkeu95/fantom-bot/config"
 	"github.com/quangkeu95/fantom-bot/lib/notification"
 	"github.com/quangkeu95/fantom-bot/pkg"
 	"github.com/quangkeu95/fantom-bot/pkg/fetcher"
@@ -47,6 +50,9 @@ type Core struct {
 	minStakingAmount  float64
 	minClaimAmount    float64
 	minTransferAmount float64
+
+	contactBook   map[string]string
+	validatorBook map[uint64]string
 
 	mu sync.RWMutex
 }
@@ -112,6 +118,8 @@ func New() (*Core, error) {
 		minStakingAmount:     minStakingAmount,
 		minClaimAmount:       minClaimAmount,
 		minTransferAmount:    minTransferAmount,
+		contactBook:          config.GetContact(),
+		validatorBook:        config.GetValidatorContact(),
 		mu:                   sync.RWMutex{},
 	}
 
@@ -127,6 +135,7 @@ func (c *Core) Run() error {
 	defer cancel()
 
 	c.SendMessage("fantom bot start")
+
 	c.l.Infow("fantom bot start", "min_staking_amount", c.minStakingAmount, "min_claim_amount", c.minClaimAmount, "min_transfer_amount", c.minTransferAmount)
 
 	if err := c.initFetchValidators(ctx); err != nil {
@@ -438,7 +447,7 @@ func (c *Core) sendCreatedValidatorMessage(item pkg.SFCValidator) {
 func (c *Core) sendBigTransferMessage(item pkg.TransferLog) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
 	msg := fmt.Sprintf("%v Big <a href=\"%s/tx/%s\">transfer</a> of <b>%f FTM</b> from <code>%s</code> to <code>%s</code>",
-		notification.EmojiWhale, explorerEndpoint, item.TxHash, item.Amount, item.From, item.To)
+		notification.EmojiWhale, explorerEndpoint, item.TxHash, item.Amount, c.getContactName(item.From), c.getContactName(item.To))
 
 	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
@@ -448,14 +457,14 @@ func (c *Core) sendBigTransferMessage(item pkg.TransferLog) {
 func (c *Core) sendDelegateMessage(item pkg.SFCDelegateInfo) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
 
-	validatorMsg := fmt.Sprintf("validator ID %v", item.ToValidatorID)
+	validatorMsg := fmt.Sprintf("validator %v", c.getValidatorName(item.ToValidatorID))
 
 	validator := c.validatorKeeper.GetValidatorById(item.ToValidatorID)
 	if validator != nil {
-		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ToValidatorID)
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator %v</a>", explorerEndpoint, validator.Address, c.getValidatorName(item.ToValidatorID))
 	}
 	msg := fmt.Sprintf("%v A <a href=\"%s/tx/%s\">delegation event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
-		notification.EmojiCheckMark, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, validatorMsg)
+		notification.EmojiCheckMark, explorerEndpoint, item.TxHash, item.Amount, c.getContactName(item.Delegator), validatorMsg)
 
 	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
@@ -465,15 +474,15 @@ func (c *Core) sendDelegateMessage(item pkg.SFCDelegateInfo) {
 func (c *Core) sendUndelegateMessage(item pkg.SFCUndelegateInfo) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
 
-	validatorMsg := fmt.Sprintf("validator ID %v", item.ToValidatorID)
+	validatorMsg := fmt.Sprintf("validator %v", c.getValidatorName(item.ToValidatorID))
 
 	validator := c.validatorKeeper.GetValidatorById(item.ToValidatorID)
 	if validator != nil {
-		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ToValidatorID)
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator %v</a>", explorerEndpoint, validator.Address, c.getValidatorName(item.ToValidatorID))
 	}
 
 	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">undelegation event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
-		notification.EmojiCrossMark, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, validatorMsg)
+		notification.EmojiCrossMark, explorerEndpoint, item.TxHash, item.Amount, c.getContactName(item.Delegator), validatorMsg)
 
 	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
@@ -483,15 +492,15 @@ func (c *Core) sendUndelegateMessage(item pkg.SFCUndelegateInfo) {
 func (c *Core) sendClaimRewardMessage(item pkg.SFCRewardInfo) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
 
-	validatorMsg := fmt.Sprintf("validator ID %v", item.ToValidatorID)
+	validatorMsg := fmt.Sprintf("validator %v", c.getValidatorName(item.ToValidatorID))
 
 	validator := c.validatorKeeper.GetValidatorById(item.ToValidatorID)
 	if validator != nil {
-		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ToValidatorID)
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator %v</a>", explorerEndpoint, validator.Address, c.getValidatorName(item.ToValidatorID))
 	}
 
 	msg := fmt.Sprintf("%v A <a href=\"%s/tx/%s\">reward claim event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
-		notification.EmojiStar, explorerEndpoint, item.TxHash, item.UnlockedReward, item.Delegator, validatorMsg)
+		notification.EmojiStar, explorerEndpoint, item.TxHash, item.UnlockedReward, c.getContactName(item.Delegator), validatorMsg)
 
 	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
@@ -501,15 +510,15 @@ func (c *Core) sendClaimRewardMessage(item pkg.SFCRewardInfo) {
 func (c *Core) sendLockedUpStakeMessage(item pkg.SFCLockedUpStake) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
 
-	validatorMsg := fmt.Sprintf("validator ID %v", item.ValidatorID)
+	validatorMsg := fmt.Sprintf("validator %v", c.getValidatorName(item.ValidatorID))
 
 	validator := c.validatorKeeper.GetValidatorById(item.ValidatorID)
 	if validator != nil {
-		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ValidatorID)
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator %v</a>", explorerEndpoint, validator.Address, c.getValidatorName(item.ValidatorID))
 	}
 
 	msg := fmt.Sprintf("%v A <a href=\"%s/tx/%s\">locked up stake event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
-		notification.EmojiLock, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, validatorMsg)
+		notification.EmojiLock, explorerEndpoint, item.TxHash, item.Amount, c.getContactName(item.Delegator), validatorMsg)
 
 	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
@@ -519,17 +528,35 @@ func (c *Core) sendLockedUpStakeMessage(item pkg.SFCLockedUpStake) {
 func (c *Core) sendUnlockedStakeMessage(item pkg.SFCUnlockedStake) {
 	explorerEndpoint := viper.GetString("fantom_chain.explorer_tx_endpoint")
 
-	validatorMsg := fmt.Sprintf("validator ID %v", item.ValidatorID)
+	validatorMsg := fmt.Sprintf("validator %v", c.getValidatorName(item.ValidatorID))
 
 	validator := c.validatorKeeper.GetValidatorById(item.ValidatorID)
 	if validator != nil {
-		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator ID %v</a>", explorerEndpoint, validator.Address, item.ValidatorID)
+		validatorMsg = fmt.Sprintf("<a href=\"%s/address/%s\">validator %v</a>", explorerEndpoint, validator.Address, c.getValidatorName(item.ValidatorID))
 	}
 
 	msg := fmt.Sprintf("%v An <a href=\"%s/tx/%s\">unlocked stake event</a> of <b>%f FTM</b> from <code>%s</code> to %s",
-		notification.EmojiUnlock, explorerEndpoint, item.TxHash, item.Amount, item.Delegator, validatorMsg)
+		notification.EmojiUnlock, explorerEndpoint, item.TxHash, item.Amount, c.getContactName(item.Delegator), validatorMsg)
 
 	if err := c.SendMessage(msg); err != nil {
 		c.l.Debugw("bot send message error", "error", err)
 	}
+}
+
+func (c *Core) getContactName(address string) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if name, ok := c.contactBook[strings.ToLower(address)]; ok {
+		return name
+	}
+	return address
+}
+
+func (c *Core) getValidatorName(id uint64) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if name, ok := c.validatorBook[id]; ok {
+		return name
+	}
+	return strconv.FormatUint(id, 10)
 }

@@ -16,5 +16,29 @@
         "token": "1897961962:AAFoG8OIX5edLH-AWZFurftzR6EjaWMo3lA",
         "chat_id": -525308538
     },
-    "storage_path": "/tmp/"
+    "storage_path": "/tmp/",
+    "contact_book": [
+        {
+            "address": "",
+            "name": ""
+        },
+        {
+            "address": "",
+            "name": ""
+        },
+        {
+            "address": "",
+            "name": ""
+        }
+    ],
+    "validator_book": [
+        {
+            "id": 1,
+            "name": "validator1"
+        },
+        {
+            "id": 2,
+            "name": "validator2"
+        }
+    ]
 }
