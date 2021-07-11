@@ -21,6 +21,10 @@
         {
             "address": "0x8800528f6b9480dbbffd65fe6d8cc075bac7c1a8",
             "name": "Binance"
+        },
+        {
+            "address": "0x21be370d5312f44cb42ce377bc9b8a0cef1a4c83",
+            "name": "Fantom Finance"
         }
     ],
     "validator_book": [
