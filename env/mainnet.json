@@ -1,7 +1,7 @@
 {
-    "min_staking_amount": 100,
-    "min_claim_amount": 100,
-    "min_transfer_amount": 100,
+    "min_staking_amount": 1000,
+    "min_claim_amount": 1000,
+    "min_transfer_amount": 1000,
     "fantom_chain": {
         "sfc_contract_address": "0xfc00face00000000000000000000000000000000",
         "rpc_endpoint": "https://rpc.fantom.network/",
@@ -19,26 +19,159 @@
     "storage_path": "/tmp/",
     "contact_book": [
         {
-            "address": "",
-            "name": ""
-        },
-        {
-            "address": "",
-            "name": ""
-        },
-        {
-            "address": "",
-            "name": ""
+            "address": "0x8800528f6b9480dbbffd65fe6d8cc075bac7c1a8",
+            "name": "Binance"
         }
     ],
     "validator_book": [
         {
             "id": 1,
-            "name": "validator1"
+            "name": "Fantom Foundation 1"
         },
         {
             "id": 2,
-            "name": "validator2"
+            "name": "Fantom Foundation 2"
+        },
+        {
+            "id": 3,
+            "name": "Fantom Foundation 3"
+        },
+        {
+            "id": 4,
+            "name": "Fantom Foundation 4"
+        },
+        {
+            "id": 5,
+            "name": "Fantom Foundation 5"
+        },
+        {
+            "id": 6,
+            "name": "Fantom Foundation 6"
+        },
+        {
+            "id": 7,
+            "name": "Fantom Foundation 7"
+        },
+        {
+            "id": 8,
+            "name": "Fantom Foundation 8"
+        },
+        {
+            "id": 9,
+            "name": "Fantom Foundation 9"
+        },
+        {
+            "id": 10,
+            "name": "Fantom Foundation 10"
+        },
+        {
+            "id": 11,
+            "name": "Fantom Foundation 11"
+        },
+        {
+            "id": 12,
+            "name": "Fantom Foundation 12"
+        },
+        {
+            "id": 13,
+            "name": "Fantom Vietnam"
+        },
+        {
+            "id": 14,
+            "name": "block42"
+        },
+        {
+            "id": 16,
+            "name": "Bullet Nodes"
+        },
+        {
+            "id": 17,
+            "name": "GoFantom"
+        },
+        {
+            "id": 21,
+            "name": "ablock - Fantom Global"
+        },
+        {
+            "id": 24,
+            "name": "Lopalcar's Node"
+        },
+        {
+            "id": 28,
+            "name": "Hyperblocks 28"
+        },
+        {
+            "id": 29,
+            "name": "Fantom NYC"
+        },
+        {
+            "id": 30,
+            "name": "Fantom Scan"
+        },
+        {
+            "id": 33,
+            "name": "NikkaFTM"
+        },
+        {
+            "id": 37,
+            "name": "MCLB-DAO 37"
+        },
+        {
+            "id": 38,
+            "name": "nodo38 $FTM"
+        },
+        {
+            "id": 40,
+            "name": "Cryptoast.io - 1 Year Lock"
+        },
+        {
+            "id": 43,
+            "name": "fantomreward"
+        }
+        },
+        {
+            "id": 44,
+            "name": "Laturus Node"
+        },
+        {
+            "id": 48,
+            "name": "FantomIndia - Highest Rewards"
+        },
+        {
+            "id": 49,
+            "name": "Stakely"
+        },
+        {
+            "id": 51,
+            "name": "Hyperblocks 51"
+        },
+        {
+            "id": 52,
+            "name": "Fantom Kings"
+        },
+        {
+            "id": 53,
+            "name": "Binary Fintech Group 53"
+        },
+        {
+            "id": 55,
+            "name": "Hyperblocks 55"
+        },
+        {
+            "id": 56,
+            "name": "Binary Fintech Group 56"
+        },
+        {
+            "id": 60,
+            "name": "C.R.E.A.M"
+        },
+        {
+            "id": 63,
+            "name": "MCLB-DAO 63"
+        },
+        {
+            "id": 64,
+            "name": "Band Protocol"
         }
     ]
 }
